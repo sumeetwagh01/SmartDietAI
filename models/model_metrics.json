@@ -1,0 +1,12 @@
+{
+  "allergen_classifier": {
+    "accuracy": null,
+    "f1_score": null,
+    "last_trained": null
+  },
+  "recommender": {
+    "rmse": null,
+    "precision_at_k": null,
+    "last_trained": null
+  }
+}
