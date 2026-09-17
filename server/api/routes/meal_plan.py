@@ -15,6 +15,7 @@ from services import (
     lp_optimizer,
     nutrition_calculator,
     sequential_adapter,
+    serialization,
 )
 
 
@@ -42,6 +43,7 @@ async def generate_meal_plan(user: dict = Depends(get_current_user)):
     result_dict["explanation"] = await asyncio.to_thread(
         gemini_service.generate_explanation, result_dict, user
     )
+    result_dict = serialization.to_json_safe(result_dict)
 
     today_str = date.today().isoformat()
     await firebase_service.save_meal_plan(user["uid"], today_str, result_dict)
