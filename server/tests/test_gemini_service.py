@@ -49,7 +49,7 @@ def install_model(monkeypatch, responses):
 
     class FakeModel:
         def __init__(self, model_name, system_instruction):
-            assert model_name == "gemini-2.5-flash"
+            assert model_name == "gemini-3.6-flash"
             assert "NEVER recommend different foods" in system_instruction
 
         def generate_content(self, prompt):
