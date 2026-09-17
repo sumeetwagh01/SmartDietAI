@@ -1,0 +1,18 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy-backend:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Render deployment
+        run: curl --fail-with-body -X POST "${{ secrets.RENDER_DEPLOY_HOOK_URL }}"
+
+  deploy-frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Vercel deployment
+        run: curl --fail-with-body -X POST "${{ secrets.VERCEL_DEPLOY_HOOK_URL }}"

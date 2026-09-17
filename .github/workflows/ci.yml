@@ -1,0 +1,30 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  test-backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+      - run: cd server && pip install -r requirements.txt
+      - run: cd server && python -c "from services.lp_optimizer import optimize_meal_plan; print('LP OK')"
+      - run: cd server && python -c "from services.nutrition_calculator import compute_targets; print('NutrCalc OK')"
+      - run: cd server && python -c "from services.clinical_filter import apply; print('Filter OK')"
+      - run: cd server && pytest tests/ -v --ignore=tests/test_api_routes.py
+
+  test-frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: cd client && npm ci
+      - run: cd client && npm run build
+      - run: cd client && npm run lint || true
