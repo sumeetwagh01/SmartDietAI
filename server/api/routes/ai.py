@@ -1,4 +1,5 @@
 import asyncio
+import json
 from datetime import date, timedelta
 
 import google.generativeai as genai
@@ -22,7 +23,7 @@ def _model():
     if hasattr(gemini_service, "model"):
         return gemini_service.model
     genai.configure(api_key=settings.GEMINI_API_KEY)
-    return genai.GenerativeModel("gemini-1.5-flash")
+    return genai.GenerativeModel(gemini_service.MODEL_NAME)
 
 
 @router.post("/chat")
@@ -38,8 +39,13 @@ async def chat(
         "today's food-log summary when personalizing your answer. "
         f"User profile: {user}. Today's food log: {today_log or {}}."
     )
-    conversation = [system_prompt, *body.history, body.message]
-    response = _model().generate_content(conversation)
+    prompt = (
+        f"{system_prompt}\n"
+        f"Conversation history: {json.dumps(body.history, default=str)}\n"
+        f"User question: {body.message}\n"
+        "Give a concise, practical answer. Do not diagnose disease or replace medical care."
+    )
+    response = await asyncio.to_thread(_model().generate_content, prompt)
     return {"reply": response.text}
 
 
@@ -56,5 +62,5 @@ async def suggestions(user: dict = Depends(get_current_user)):
         "Give exactly one short, practical diet tip based on this user profile "
         f"and recent three-day food log. Profile: {user}. Logs: {logs}."
     )
-    response = _model().generate_content(prompt)
+    response = await asyncio.to_thread(_model().generate_content, prompt)
     return {"tip": response.text}

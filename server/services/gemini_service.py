@@ -7,6 +7,8 @@ import google.generativeai as genai
 from config.settings import settings
 
 
+MODEL_NAME = "gemini-2.5-flash"
+
 SYSTEM_INSTRUCTION = (
     "You are a nutrition advisor explaining a pre-computed meal plan. "
     "NEVER recommend different foods. "
@@ -123,7 +125,7 @@ def generate_explanation(lp_result: dict, user_profile: dict) -> dict:
     try:
         genai.configure(api_key=settings.GEMINI_API_KEY)
         model = genai.GenerativeModel(
-            "gemini-1.5-flash",
+            MODEL_NAME,
             system_instruction=SYSTEM_INSTRUCTION,
         )
     except Exception:
