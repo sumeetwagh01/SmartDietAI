@@ -7,6 +7,7 @@ import pandas as pd
 from fastapi import APIRouter, Depends, HTTPException
 
 from api.middleware.auth_middleware import get_current_user
+from config.firebase_config import get_db
 from models.user import UserProfile
 from services import (
     clinical_filter,
@@ -28,7 +29,9 @@ FOOD_DB = pd.read_csv(
 @router.post("/generate")
 async def generate_meal_plan(user: dict = Depends(get_current_user)):
     profile = UserProfile(**user)
-    actual_yesterday = await sequential_adapter.get_yesterday_intake(user["uid"])
+    actual_yesterday = await sequential_adapter.get_yesterday_intake(
+        user["uid"], get_db()
+    )
     targets = nutrition_calculator.compute_targets(profile, actual_yesterday)
     safe_foods = clinical_filter.apply(FOOD_DB, profile)
     if len(safe_foods) < 4:
