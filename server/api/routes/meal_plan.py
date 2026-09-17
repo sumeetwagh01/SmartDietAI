@@ -1,5 +1,4 @@
 import asyncio
-from dataclasses import asdict
 from datetime import date, timedelta
 from pathlib import Path
 
@@ -29,23 +28,26 @@ FOOD_DB = pd.read_csv(
 @router.post("/generate")
 async def generate_meal_plan(user: dict = Depends(get_current_user)):
     profile = UserProfile(**user)
-    actual_yesterday = await sequential_adapter.get_yesterday_intake(
-        user["uid"], get_db()
-    )
-    targets = nutrition_calculator.compute_targets(profile, actual_yesterday)
-    safe_foods = clinical_filter.apply(FOOD_DB, profile)
-    if len(safe_foods) < 4:
+    db = get_db()
+    actual_kcal = await sequential_adapter.get_yesterday_intake(user["uid"], db)
+    targets = nutrition_calculator.compute_targets(profile, actual_kcal)
+    safe_db = clinical_filter.apply(FOOD_DB, profile)
+    if len(safe_db) < 4:
         raise HTTPException(
             status_code=422,
             detail="Too few foods after clinical filter",
         )
 
-    result = lp_optimizer.optimize_meal_plan(profile, safe_foods, targets)
+    result = lp_optimizer.optimize_meal_plan(profile, safe_db, None)
     result_dict = result.to_dict()
-    result_dict["targets"] = asdict(targets)
-    result_dict["explanation"] = await asyncio.to_thread(
-        gemini_service.generate_explanation, result_dict, user
-    )
+    profile_dict = profile.model_dump(mode="json")
+    try:
+        explanation = await asyncio.to_thread(
+            gemini_service.generate_explanation, result_dict, profile_dict
+        )
+    except Exception:
+        explanation = None
+    result_dict["explanation"] = explanation
     result_dict = serialization.to_json_safe(result_dict)
 
     today_str = date.today().isoformat()
