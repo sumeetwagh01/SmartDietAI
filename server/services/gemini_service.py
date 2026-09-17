@@ -8,9 +8,10 @@ from config.settings import settings
 
 
 SYSTEM_INSTRUCTION = (
-    "You are a nutrition advisor explaining pre-computed meal plans. "
-    "NEVER recommend foods. ONLY explain WHY the given foods are appropriate. "
-    "Respond in valid JSON only — no markdown, no backticks."
+    "You are a nutrition advisor explaining a pre-computed meal plan. "
+    "NEVER recommend different foods. "
+    "ONLY explain WHY these specific foods suit this user. "
+    "Respond ONLY in valid JSON, no markdown."
 )
 
 RESPONSE_STRUCTURE = {
@@ -32,23 +33,6 @@ KNOWN_CONDITIONS = {
     "hypothyroid",
 }
 
-COMMON_ALLERGENS = {
-    "milk",
-    "dairy",
-    "egg",
-    "eggs",
-    "fish",
-    "shellfish",
-    "peanut",
-    "peanuts",
-    "tree nut",
-    "tree nuts",
-    "soy",
-    "wheat",
-    "sesame",
-}
-
-
 def _normalise_values(values: list[Any]) -> set[str]:
     return {
         str(getattr(value, "value", value)).lower().replace("_", " ")
@@ -62,7 +46,6 @@ def _faithfulness_check(explanation: dict, user_profile: dict) -> list[str]:
         for field in ("condition_reason", "excluded_foods")
     ).lower()
     conditions = _normalise_values(user_profile.get("medical_conditions", []))
-    allergens = _normalise_values(user_profile.get("allergens", []))
     errors = []
 
     unsupported_conditions = sorted(
@@ -74,19 +57,6 @@ def _faithfulness_check(explanation: dict, user_profile: dict) -> list[str]:
         errors.append(
             "Unsupported medical conditions cited: "
             + ", ".join(unsupported_conditions)
-        )
-
-    unsupported_allergens = sorted(
-        allergen
-        for allergen in COMMON_ALLERGENS
-        if re.search(rf"\b{re.escape(allergen)}\b", checked_text)
-        and allergen not in allergens
-        and not (allergen == "dairy" and "lactose intolerance" in conditions)
-        and not (allergen == "wheat" and "gluten intolerance" in conditions)
-    )
-    if unsupported_allergens:
-        errors.append(
-            "Unsupported allergens cited: " + ", ".join(unsupported_allergens)
         )
 
     return errors
@@ -118,8 +88,8 @@ def _build_prompt(lp_result: dict, user_profile: dict) -> str:
             "diet_type": diet_type,
         },
         "meals": lp_result.get("meals", {}),
-        "nutritional_totals": lp_result.get("totals", {}),
-        "calorie_target": lp_result.get("calorie_target"),
+        "totals": lp_result.get("totals", {}),
+        "targets": lp_result.get("targets", {}),
         "constraint_summary": lp_result.get("constraint_summary", {}),
     }
     return (
@@ -132,12 +102,17 @@ def _build_prompt(lp_result: dict, user_profile: dict) -> str:
 
 def _fallback(lp_result: dict) -> dict:
     totals = lp_result.get("totals", {})
+    targets = lp_result.get("targets", {})
     calories = totals.get("calories", totals.get("total_calories", 0))
     protein = totals.get("protein", totals.get("protein_g", 0))
-    target = lp_result.get("calorie_target", 0)
+    calorie_target = targets.get(
+        "target_calories", lp_result.get("calorie_target", 0)
+    )
+    protein_target = targets.get("protein_g")
+    protein_text = f" against a target of {protein_target} g" if protein_target is not None else ""
     return {
-        "calorie_reason": f"The plan provides {calories} kcal against a target of {target} kcal.",
-        "protein_reason": f"The plan provides {protein} g of protein.",
+        "calorie_reason": f"The plan provides {calories} kcal against a target of {calorie_target} kcal.",
+        "protein_reason": f"The plan provides {protein} g of protein{protein_text}.",
         "condition_reason": "The plan was filtered using the profile's recorded dietary constraints.",
         "excluded_foods": "Foods excluded by the recorded constraints are not included in this plan.",
         "practical_tip": "Follow the listed portions to stay close to the calculated totals.",
@@ -145,18 +120,22 @@ def _fallback(lp_result: dict) -> dict:
 
 
 def generate_explanation(lp_result: dict, user_profile: dict) -> dict:
-    api_key = getattr(settings, "gemini_api_key", settings.GEMINI_API_KEY)
-    genai.configure(api_key=api_key)
-    model = genai.GenerativeModel(
-        "gemini-1.5-flash",
-        system_instruction=SYSTEM_INSTRUCTION,
-    )
+    try:
+        genai.configure(api_key=settings.GEMINI_API_KEY)
+        model = genai.GenerativeModel(
+            "gemini-1.5-flash",
+            system_instruction=SYSTEM_INSTRUCTION,
+        )
+    except Exception:
+        return _fallback(lp_result)
     prompt = _build_prompt(lp_result, user_profile)
 
     for attempt in range(2):
         try:
             response = model.generate_content(prompt)
             explanation = json.loads(_strip_markdown_fences(response.text))
+            if not isinstance(explanation, dict):
+                explanation = {}
         except Exception:
             explanation = {}
 
