@@ -157,7 +157,7 @@ def generate_explanation(lp_result: dict, user_profile: dict) -> dict:
         try:
             response = model.generate_content(prompt)
             explanation = json.loads(_strip_markdown_fences(response.text))
-        except (ValueError, TypeError, AttributeError, json.JSONDecodeError):
+        except Exception:
             explanation = {}
 
         errors = _faithfulness_check(explanation, user_profile)

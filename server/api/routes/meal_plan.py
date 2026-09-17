@@ -1,4 +1,5 @@
 import asyncio
+from dataclasses import asdict
 from datetime import date, timedelta
 from pathlib import Path
 
@@ -25,26 +26,22 @@ FOOD_DB = pd.read_csv(
 
 @router.post("/generate")
 async def generate_meal_plan(user: dict = Depends(get_current_user)):
+    profile = UserProfile(**user)
     actual_yesterday = await sequential_adapter.get_yesterday_intake(user["uid"])
-    targets = nutrition_calculator.compute_targets(
-        UserProfile(**user), actual_yesterday
-    )
-    safe_foods = clinical_filter.apply(FOOD_DB, UserProfile(**user))
+    targets = nutrition_calculator.compute_targets(profile, actual_yesterday)
+    safe_foods = clinical_filter.apply(FOOD_DB, profile)
     if len(safe_foods) < 4:
         raise HTTPException(
             status_code=422,
             detail="Too few foods after clinical filter",
         )
 
-    result = lp_optimizer.optimize_meal_plan(
-        UserProfile(**user), safe_foods, None
-    )
+    result = lp_optimizer.optimize_meal_plan(profile, safe_foods, targets)
     result_dict = result.to_dict()
-    try:
-        explanation = gemini_service.generate_explanation(result_dict, user)
-    except Exception:
-        explanation = None
-    result_dict["explanation"] = explanation
+    result_dict["targets"] = asdict(targets)
+    result_dict["explanation"] = await asyncio.to_thread(
+        gemini_service.generate_explanation, result_dict, user
+    )
 
     today_str = date.today().isoformat()
     await firebase_service.save_meal_plan(user["uid"], today_str, result_dict)
