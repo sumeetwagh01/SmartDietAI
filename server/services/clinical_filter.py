@@ -21,7 +21,7 @@ def apply(food_db: pd.DataFrame, profile: UserProfile) -> pd.DataFrame:
 
     if profile.is_vegan:
         filtered = filtered[filtered["is_vegan"] == True]  # noqa: E712
-    elif profile.is_vegetarian:
+    if profile.is_vegetarian:
         filtered = filtered[filtered["is_vegetarian"] == True]  # noqa: E712
 
     allergen_values = filtered["allergens"].fillna("").astype(str)
