@@ -29,7 +29,7 @@ async def create_food_log(
     log = {
         "id": f'{user["uid"]}_{date_str}',
         "uid": user["uid"],
-        "date": body.date,
+        "date": date_str,
         "meal_type": body.meal_type,
         "entries": entries,
         **totals,

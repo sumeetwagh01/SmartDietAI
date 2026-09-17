@@ -62,6 +62,7 @@ async def test_post_saves_daily_document_and_returns_totals(monkeypatch):
     assert saved["uid"] == "user-1"
     assert saved["date_str"] == "2026-09-18"
     assert saved["log"]["id"] == "user-1_2026-09-18"
+    assert saved["log"]["date"] == "2026-09-18"
     assert len(saved["log"]["entries"]) == 2
     assert saved["log"]["total_calories"] == 600
 
