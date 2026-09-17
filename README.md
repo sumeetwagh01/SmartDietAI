@@ -58,6 +58,14 @@ npm run dev
 
 Pushes to `main` trigger the Render and Vercel deployment hooks configured in GitHub repository secrets. Pull requests to `main` or `develop` run backend tests and frontend build checks.
 
+## Rebuilding the food database
+
+The committed database can be regenerated from the cleaned source datasets:
+
+```bash
+python scripts/build_food_db.py /path/to/data/processed server/data/food_db_final.csv
+```
+
 ## Team
 
 Rakshit Rajput · Krushna Mahajan · Sumeet Wagh  
