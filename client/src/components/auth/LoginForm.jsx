@@ -24,7 +24,12 @@ export default function LoginForm() {
       setAuth(user, auth.token)
       navigate('/dashboard')
     } catch (requestError) {
-      setError(requestError.response?.data?.detail || 'Unable to sign in.')
+      setError(
+        requestError.response?.data?.detail ||
+        (requestError.request
+          ? 'Cannot reach the SmartDiet API. Please try again.'
+          : 'Unable to sign in.'),
+      )
     } finally {
       setLoading(false)
     }

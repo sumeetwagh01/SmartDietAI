@@ -17,9 +17,12 @@ axiosInstance.interceptors.request.use((config) => {
 axiosInstance.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    const hadSession = Boolean(useAuthStore.getState().token)
+    if (error.response?.status === 401 && hadSession) {
       useAuthStore.getState().clearAuth()
-      window.location.assign('/login')
+      if (window.location.pathname !== '/login') {
+        window.location.assign('/login')
+      }
     }
     return Promise.reject(error)
   },

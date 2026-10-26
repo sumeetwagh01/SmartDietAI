@@ -9,6 +9,10 @@ class Settings(BaseSettings):
     FIREBASE_WEB_API_KEY: str
     JWT_SECRET: str
     ALLOWED_ORIGINS: str
+    ALLOWED_ORIGIN_REGEX: str = (
+        r"^https://(?:smart-diet-ai-smartdiet|smart-diet-[a-z0-9-]+-smartdiet)"
+        r"\.vercel\.app$"
+    )
     ENVIRONMENT: str
 
     model_config = SettingsConfigDict(env_file=".env")
