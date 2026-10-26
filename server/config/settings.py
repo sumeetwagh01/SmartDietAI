@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     JWT_SECRET: str
     ALLOWED_ORIGINS: str
     ALLOWED_ORIGIN_REGEX: str = (
-        r"^https://(?:smart-diet-ai-smartdiet|smart-diet-[a-z0-9-]+-smartdiet)"
+        r"^https://(?:smart-diet-ai-(?:smartdiet|tan)|smart-diet-[a-z0-9-]+-smartdiet)"
         r"\.vercel\.app$"
     )
     ENVIRONMENT: str
