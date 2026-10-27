@@ -99,3 +99,31 @@ async def claim_ai_generations(uid: str, date_str: str, count: int = 1) -> None:
         transaction.set(reference, {"count": used + count, "last_generated_at": now.isoformat(), "date": date_str})
 
     await asyncio.to_thread(claim, db.transaction())
+
+
+async def release_ai_generations(uid: str, date_str: str, count: int = 1) -> None:
+    """Release a generation reservation when the provider fails.
+
+    Failed Gemini requests must not consume the user's daily allowance or leave
+    the short retry cooldown active.
+    """
+    db = get_db()
+    reference = db.collection("ai_usage").document(f"{uid}_{date_str}")
+
+    @firestore.transactional
+    def release(transaction):
+        snapshot = reference.get(transaction=transaction)
+        if not snapshot.exists:
+            return
+        current = snapshot.to_dict() or {}
+        transaction.set(
+            reference,
+            {
+                "count": max(0, int(current.get("count", 0) or 0) - count),
+                "last_generated_at": "1970-01-01T00:00:00+00:00",
+                "date": date_str,
+            },
+            merge=True,
+        )
+
+    await asyncio.to_thread(release, db.transaction())

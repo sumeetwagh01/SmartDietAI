@@ -57,6 +57,14 @@ async def _claim(uid: str, count: int) -> None:
         raise HTTPException(status_code=429, detail=str(exc)) from exc
 
 
+async def _release(uid: str, count: int) -> None:
+    try:
+        await firebase_service.release_ai_generations(uid, date.today().isoformat(), count)
+    except Exception:
+        # Releasing quota is best-effort and must not mask the generation error.
+        pass
+
+
 async def _generate_and_save_targets(uid: str, profile: dict, preferences: AiPreferences, hash_value: str) -> dict:
     try:
         targets = await ai_nutrition_service.generate_targets(profile, preferences)
@@ -92,7 +100,11 @@ async def generate_targets(body: GenerateTargetsRequest, user: dict = Depends(ge
     if not body.force and cached and cached.get("profile_hash") == hash_value and cached.get("targets"):
         return cached["targets"]
     await _claim(user["uid"], 1)
-    return await _generate_and_save_targets(user["uid"], profile, body.preferences, hash_value)
+    try:
+        return await _generate_and_save_targets(user["uid"], profile, body.preferences, hash_value)
+    except HTTPException:
+        await _release(user["uid"], 1)
+        raise
 
 
 @router.get("/today")
@@ -114,12 +126,22 @@ async def generate_meal_plan(body: GenerateMealPlanRequest, user: dict = Depends
 
     cached_targets = await firebase_service.get_ai_targets(user["uid"])
     valid_targets = cached_targets and cached_targets.get("profile_hash") == hash_value and cached_targets.get("targets")
-    await _claim(user["uid"], 1 if valid_targets else 2)
-    targets = cached_targets["targets"] if valid_targets else await _generate_and_save_targets(user["uid"], profile, body.preferences, hash_value)
+    reserved = 1 if valid_targets else 2
+    await _claim(user["uid"], reserved)
+    generated_targets = False
     try:
+        if valid_targets:
+            targets = cached_targets["targets"]
+        else:
+            targets = await _generate_and_save_targets(user["uid"], profile, body.preferences, hash_value)
+            generated_targets = True
         plan = await ai_nutrition_service.generate_meal_plan(profile, body.preferences, targets, date_str)
     except AiGenerationError as exc:
+        await _release(user["uid"], 1 if generated_targets else reserved)
         raise HTTPException(status_code=502, detail=str(exc)) from exc
+    except HTTPException:
+        await _release(user["uid"], reserved)
+        raise
     stored = {**plan, "profile_hash": hash_value, "preferences": body.preferences.model_dump(mode="json")}
     await firebase_service.save_ai_plan(user["uid"], date_str, stored)
     return stored

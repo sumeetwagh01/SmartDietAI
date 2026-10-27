@@ -72,7 +72,7 @@ PLAN_SCHEMA_TEXT = {
 }
 
 
-async def _call_gemini(system_instruction: str, prompt: str, response_schema) -> str:
+async def _call_gemini(system_instruction: str, prompt: str) -> str:
     def run() -> str:
         with genai.Client(api_key=settings.GEMINI_API_KEY) as client:
             response = client.models.generate_content(
@@ -81,7 +81,6 @@ async def _call_gemini(system_instruction: str, prompt: str, response_schema) ->
                 config=types.GenerateContentConfig(
                     system_instruction=system_instruction,
                     response_mime_type="application/json",
-                    response_schema=response_schema,
                 ),
             )
             if not response.text:
@@ -96,7 +95,7 @@ async def generate_targets(profile: dict, preferences: AiPreferences) -> dict:
     prompt = f"User data: {json.dumps(payload, separators=(',', ':'))}\nReturn this exact JSON shape: {json.dumps(TARGET_SCHEMA_TEXT)}"
     for attempt in range(MAX_ATTEMPTS):
         try:
-            raw = await _call_gemini(TARGET_SYSTEM, prompt, AiTargets)
+            raw = await _call_gemini(TARGET_SYSTEM, prompt)
             targets = AiTargets.model_validate(json.loads(_strip_fences(raw))).model_dump(mode="json")
             errors = validate_targets(targets, profile)
         except Exception as exc:
@@ -104,7 +103,7 @@ async def generate_targets(profile: dict, preferences: AiPreferences) -> dict:
         if not errors:
             logger.info("ai-plan targets ok retries=%s", attempt)
             return targets
-        logger.warning("ai-plan targets retry=%s", attempt + 1)
+        logger.warning("ai-plan targets retry=%s errors=%s", attempt + 1, errors)
         prompt += "\nCorrect every validation failure and return the full JSON again: " + "; ".join(errors)
     logger.error("ai-plan targets failed retries=%s", MAX_ATTEMPTS - 1)
     raise AiGenerationError("Couldn't generate a safe result right now. Please try again.")
@@ -117,7 +116,7 @@ async def generate_meal_plan(profile: dict, preferences: AiPreferences, targets:
     prompt = f"Planning data: {json.dumps(payload, separators=(',', ':'))}\nReturn this exact JSON shape: {json.dumps(PLAN_SCHEMA_TEXT)}"
     for attempt in range(MAX_ATTEMPTS):
         try:
-            raw = await _call_gemini(PLAN_SYSTEM, prompt, GeminiMealPlan)
+            raw = await _call_gemini(PLAN_SYSTEM, prompt)
             generated = GeminiMealPlan.model_validate(json.loads(_strip_fences(raw))).model_dump(mode="json")
             errors = validate_plan(generated, validation_profile, targets)
         except Exception as exc:
@@ -134,7 +133,7 @@ async def generate_meal_plan(profile: dict, preferences: AiPreferences, targets:
                 "targets": targets,
                 "generated_at": datetime.now(UTC).isoformat(),
             }
-        logger.warning("ai-plan meal-plan retry=%s", attempt + 1)
+        logger.warning("ai-plan meal-plan retry=%s errors=%s", attempt + 1, errors)
         prompt += "\nCorrect every validation failure and return the full JSON again: " + "; ".join(errors)
     logger.error("ai-plan meal-plan failed retries=%s", MAX_ATTEMPTS - 1)
     raise AiGenerationError("Couldn't generate a safe result right now. Please try again.")
