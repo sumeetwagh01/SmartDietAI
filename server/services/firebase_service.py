@@ -11,6 +11,9 @@ class AiUsageError(RuntimeError):
     pass
 
 
+AI_USAGE_RECOVERY_VERSION = 1
+
+
 async def _get_document(collection: str, document_id: str) -> Optional[dict]:
     db = get_db()
     loop = asyncio.get_event_loop()
@@ -77,6 +80,7 @@ async def save_ai_plan(uid: str, date_str: str, data: dict) -> None:
 async def claim_ai_generations(uid: str, date_str: str, count: int = 1) -> None:
     db = get_db()
     reference = db.collection("ai_usage").document(f"{uid}_{date_str}")
+    targets_reference = db.collection("ai_targets").document(uid)
 
     @firestore.transactional
     def claim(transaction):
@@ -84,7 +88,15 @@ async def claim_ai_generations(uid: str, date_str: str, count: int = 1) -> None:
         current = snapshot.to_dict() if snapshot.exists else {}
         used = int(current.get("count", 0) or 0)
         if used + count > 12:
-            raise AiUsageError("Daily AI limit reached. Try again tomorrow.")
+            targets_snapshot = targets_reference.get(transaction=transaction)
+            recovery_version = int(current.get("recovery_version", 0) or 0)
+            if not targets_snapshot.exists and recovery_version < AI_USAGE_RECOVERY_VERSION:
+                # The structured-output production bug consumed reservations
+                # without ever creating targets. Recover those failed calls once.
+                used = 0
+                current["recovery_version"] = AI_USAGE_RECOVERY_VERSION
+            else:
+                raise AiUsageError("Daily AI limit reached. Try again tomorrow.")
         now = datetime.now(UTC)
         previous = current.get("last_generated_at")
         if previous:
@@ -96,7 +108,20 @@ async def claim_ai_generations(uid: str, date_str: str, count: int = 1) -> None:
                     raise AiUsageError("Please wait a few seconds before generating again.")
             except ValueError:
                 pass
-        transaction.set(reference, {"count": used + count, "last_generated_at": now.isoformat(), "date": date_str})
+        transaction.set(
+            reference,
+            {
+                "count": used + count,
+                "last_generated_at": now.isoformat(),
+                "date": date_str,
+                **(
+                    {"recovery_version": current["recovery_version"]}
+                    if "recovery_version" in current
+                    else {}
+                ),
+            },
+            merge=True,
+        )
 
     await asyncio.to_thread(claim, db.transaction())
 
