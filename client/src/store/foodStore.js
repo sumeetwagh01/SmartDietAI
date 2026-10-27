@@ -12,6 +12,7 @@ const useFoodStore = create((set) => ({
       todayLogs: state.todayLogs.filter((_, itemIndex) => itemIndex !== index),
     })),
   setDate: (selectedDate) => set({ selectedDate, todayLogs: [] }),
+  clearFoodState: () => set({ selectedDate: new Date().toISOString().slice(0, 10), todayLogs: [] }),
 }))
 
 export default useFoodStore

@@ -1,12 +1,12 @@
 # SmartDiet AI
 
-An AI-assisted nutrition platform that builds clinically aware, personalized Indian meal plans.
+An AI-assisted nutrition platform that builds safety-checked, personalized Indian meal plans.
 
 ## What it does
 
-- Selects balanced meals with linear programming instead of relying on generative guesses.
-- Carries calorie differences forward from the previous day with a bounded sequential adjustment.
-- Uses Gemini to explain computed plans, followed by a faithfulness check that rejects unsupported claims.
+- Uses Gemini to calculate daily calorie, macro, fibre and water targets and to generate the live UI meal plan.
+- Validates every Gemini result with strict Pydantic schemas, nutrition plausibility checks and server-side diet/allergen/medical keyword safety rules before returning it.
+- Keeps the original linear-programming planner, clinical filter and sequential adjustment routes for compatibility and their existing tests; the React UI no longer calls that planner.
 - Searches a normalized database of 1,075 Indian foods with nutrition and dietary metadata.
 
 ## Architecture
@@ -18,8 +18,9 @@ React (Vercel)
 FastAPI (Render)
       |
       +--> Firebase Firestore
-      +--> LP Optimizer (PuLP/CBC)
-      +--> Gemini API
+      +--> Gemini API (targets + meal plans)
+      +--> Server-side AI safety validation
+      +--> Legacy LP Optimizer (retained, not used by the UI)
 ```
 
 ## Local setup
@@ -37,9 +38,21 @@ FastAPI (Render)
 cd server
 cp .env.example .env
 # Fill in your values
+# GEMINI_MODEL defaults to gemini-3.6-flash and can be overridden as models change.
 pip install -r requirements.txt
 uvicorn main:app --reload
 ```
+
+### AI plan API
+
+All routes require the existing Firebase bearer token:
+
+- `GET /api/v1/ai-plan/targets` returns cached targets and whether profile changes made them stale.
+- `POST /api/v1/ai-plan/targets` calculates or reuses targets for the profile/preference hash.
+- `GET /api/v1/ai-plan/today?date=YYYY-MM-DD` returns a cached plan or `null`.
+- `POST /api/v1/ai-plan/meal-plan` generates or reuses a safety-checked plan.
+
+Generation is limited to 12 Gemini calls per user per day with a 10-second cooldown. Invalid, unsafe or timed-out output is retried twice and then returns a safe error without partial data. The safety scan is keyword-based and may miss unusual ingredient names or over-block a safe name; all nutrition values are Gemini estimates and are not backed by the food database. SmartDiet AI is not medical advice.
 
 ### Frontend
 

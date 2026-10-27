@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from api.routes import ai, auth, food_log, meal_plan, nutrition, progress
+from api.routes import ai, ai_plan, auth, food_log, meal_plan, nutrition, progress
 from config.firebase_config import init_firebase
 from config.settings import settings
 
@@ -30,6 +30,7 @@ app.include_router(meal_plan.router, prefix="/api/v1")
 app.include_router(food_log.router, prefix="/api/v1")
 app.include_router(nutrition.router, prefix="/api/v1")
 app.include_router(ai.router, prefix="/api/v1")
+app.include_router(ai_plan.router, prefix="/api/v1")
 app.include_router(progress.router, prefix="/api/v1")
 
 

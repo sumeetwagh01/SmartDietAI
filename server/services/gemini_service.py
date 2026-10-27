@@ -7,7 +7,7 @@ import google.generativeai as genai
 from config.settings import settings
 
 
-MODEL_NAME = "gemini-3.6-flash"
+MODEL_NAME = settings.GEMINI_MODEL
 
 SYSTEM_INSTRUCTION = (
     "You are a nutrition advisor explaining a pre-computed meal plan. "

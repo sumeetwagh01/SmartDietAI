@@ -1,53 +1,23 @@
+import { Minus, Plus } from 'lucide-react'
 import { useState } from 'react'
 
-import { logFood } from '@/api/foodLog'
+import BottomSheet from '@/components/ui/BottomSheet'
 import Button from '@/components/ui/Button'
-import Card from '@/components/ui/Card'
-import Input from '@/components/ui/Input'
+import { entryFromFood, mealLabels } from '@/utils/food'
 
-export default function AddMealModal({ food, date, onClose, onSaved }) {
+export default function AddMealModal({ food, mealType = 'breakfast', onClose, onSave }) {
   const [quantity, setQuantity] = useState(1)
-  const [mealType, setMealType] = useState('breakfast')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-
-  if (!food) return null
+  const preview = food ? entryFromFood(food, quantity) : null
 
   const save = async () => {
-    setLoading(true)
-    setError('')
-    const multiplier = Number(quantity) || 1
-    const entry = {
-      food_name: food.name,
-      quantity: multiplier,
-      unit: 'serving',
-      calories: (food.calories || 0) * multiplier,
-      protein: (food.protein || 0) * multiplier,
-      carbs: (food.carbs || 0) * multiplier,
-      fat: (food.fat || 0) * multiplier,
-      fibre: (food.fibre || 0) * multiplier,
-      sodium: (food.sodium || 0) * multiplier,
-    }
-    try {
-      await logFood({ date, meal_type: mealType, entries: [entry] })
-      onSaved?.()
-      onClose()
-    } catch (requestError) {
-      setError(requestError.response?.data?.detail || 'Unable to save this food. Please try again.')
-    } finally {
-      setLoading(false)
-    }
+    if (!food || loading) return
+    setLoading(true); setError('')
+    try { await onSave(preview); onClose() }
+    catch (requestError) { setError(requestError?.message || 'Unable to save this food. Please try again.') }
+    finally { setLoading(false) }
   }
 
-  return (
-    <div className="absolute inset-0 z-40 flex min-h-full items-center justify-center bg-gray-900/40 p-4">
-      <Card className="w-full max-w-md space-y-4">
-        <div><p className="text-sm text-gray-500">Add food</p><h2 className="text-xl font-semibold">{food.name}</h2></div>
-        <Input label="Quantity" type="number" min="0.1" step="0.1" value={quantity} onChange={(event) => setQuantity(event.target.value)} />
-        <label className="block space-y-1.5 text-left"><span className="text-sm font-medium text-gray-700">Meal type</span><select value={mealType} onChange={(event) => setMealType(event.target.value)} className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 outline-none focus:border-brand-green"><option value="breakfast">Breakfast</option><option value="lunch">Lunch</option><option value="dinner">Dinner</option><option value="snack">Snack</option></select></label>
-        {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
-        <div className="flex justify-end gap-2"><Button variant="ghost" onClick={onClose}>Cancel</Button><Button loading={loading} onClick={save}>Save</Button></div>
-      </Card>
-    </div>
-  )
+  return <BottomSheet open={Boolean(food)} title={`Add to ${mealLabels[mealType]}`} onClose={onClose}>{food ? <div className="space-y-5"><div><p className="text-xl font-semibold">{food.name || food.food_name}</p><p className="mt-1 text-sm text-muted">{food.unit || '1 serving'}</p></div><div><span className="mb-2 block text-sm font-medium">Quantity</span><div className="flex items-center justify-between rounded-2xl bg-surface-2 p-1"><button type="button" onClick={() => setQuantity((value) => Math.max(0.25, value - 0.25))} className="grid min-h-11 min-w-11 place-items-center rounded-xl hover:bg-surface" aria-label="Decrease quantity"><Minus size={18} /></button><input aria-label="Quantity" type="number" min="0.25" step="0.25" value={quantity} onChange={(event) => setQuantity(Math.max(0.25, Number(event.target.value) || 0.25))} className="w-24 bg-transparent text-center text-xl font-bold outline-none" /><button type="button" onClick={() => setQuantity((value) => value + 0.25)} className="grid min-h-11 min-w-11 place-items-center rounded-xl hover:bg-surface" aria-label="Increase quantity"><Plus size={18} /></button></div></div><div className="grid grid-cols-2 gap-3 sm:grid-cols-5">{[['Calories', preview.calories, 'kcal'], ['Protein', preview.protein, 'g'], ['Carbs', preview.carbs, 'g'], ['Fat', preview.fat, 'g'], ['Fibre', preview.fibre, 'g']].map(([label, value, unit]) => <div key={label} className="rounded-2xl bg-surface-2 p-3"><p className="text-xs text-muted">{label}</p><p className="mt-1 font-bold">{Math.round(value)}<span className="ml-1 text-xs font-normal text-muted">{unit}</span></p></div>)}</div>{error ? <p className="text-sm text-error" role="alert">{error}</p> : null}<Button className="w-full" loading={loading} loadingLabel="Saving…" onClick={save}>Add food</Button></div> : null}</BottomSheet>
 }

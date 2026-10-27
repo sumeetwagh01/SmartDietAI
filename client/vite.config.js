@@ -12,7 +12,10 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      '/api': 'http://localhost:8000',
+      '/api': {
+        target: 'https://smartdietai-q3rr.onrender.com',
+        changeOrigin: true,
+      },
     },
   },
 })

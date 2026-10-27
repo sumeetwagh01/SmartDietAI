@@ -1,7 +1,14 @@
 import asyncio
+from datetime import UTC, datetime
 from typing import Optional
 
+from firebase_admin import firestore
+
 from config.firebase_config import get_db
+
+
+class AiUsageError(RuntimeError):
+    pass
 
 
 async def _get_document(collection: str, document_id: str) -> Optional[dict]:
@@ -49,3 +56,46 @@ async def save_food_log(uid: str, date_str: str, log: dict) -> None:
 
 async def get_food_log(uid: str, date_str: str) -> Optional[dict]:
     return await _get_document("food_logs", f"{uid}_{date_str}")
+
+
+async def get_ai_targets(uid: str) -> Optional[dict]:
+    return await _get_document("ai_targets", uid)
+
+
+async def save_ai_targets(uid: str, data: dict) -> None:
+    await _set_document("ai_targets", uid, data)
+
+
+async def get_ai_plan(uid: str, date_str: str) -> Optional[dict]:
+    return await _get_document("ai_plans", f"{uid}_{date_str}")
+
+
+async def save_ai_plan(uid: str, date_str: str, data: dict) -> None:
+    await _set_document("ai_plans", f"{uid}_{date_str}", data)
+
+
+async def claim_ai_generations(uid: str, date_str: str, count: int = 1) -> None:
+    db = get_db()
+    reference = db.collection("ai_usage").document(f"{uid}_{date_str}")
+
+    @firestore.transactional
+    def claim(transaction):
+        snapshot = reference.get(transaction=transaction)
+        current = snapshot.to_dict() if snapshot.exists else {}
+        used = int(current.get("count", 0) or 0)
+        if used + count > 12:
+            raise AiUsageError("Daily AI limit reached. Try again tomorrow.")
+        now = datetime.now(UTC)
+        previous = current.get("last_generated_at")
+        if previous:
+            try:
+                parsed = datetime.fromisoformat(str(previous).replace("Z", "+00:00"))
+                if parsed.tzinfo is None:
+                    parsed = parsed.replace(tzinfo=UTC)
+                if (now - parsed).total_seconds() < 10:
+                    raise AiUsageError("Please wait a few seconds before generating again.")
+            except ValueError:
+                pass
+        transaction.set(reference, {"count": used + count, "last_generated_at": now.isoformat(), "date": date_str})
+
+    await asyncio.to_thread(claim, db.transaction())

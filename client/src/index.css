@@ -3,8 +3,49 @@
 @tailwind utilities;
 
 @layer base {
-  body {
-    @apply m-0 min-h-screen bg-gray-50 font-sans text-gray-900 antialiased;
+  :root {
+    color-scheme: light;
+    --color-bg: 247 248 250;
+    --color-surface: 255 255 255;
+    --color-surface-2: 240 242 245;
+    --color-border: 228 231 235;
+    --color-text: 15 23 42;
+    --color-muted: 100 116 139;
   }
 
+  .dark {
+    color-scheme: dark;
+    --color-bg: 11 11 12;
+    --color-surface: 27 27 30;
+    --color-surface-2: 35 35 39;
+    --color-border: 42 42 46;
+    --color-text: 244 244 245;
+    --color-muted: 154 154 160;
+  }
+
+  * { @apply border-line; }
+  html { @apply bg-canvas; }
+  body {
+    @apply m-0 min-h-screen bg-canvas font-sans text-ink antialiased;
+  }
+  button, input, select, textarea, a { @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-canvas; }
+  button, a { -webkit-tap-highlight-color: transparent; }
+  ::selection { background: #D9EC7D; color: #101010; }
+}
+
+@layer utilities {
+  .skeleton { @apply animate-pulse rounded-xl bg-surface-2; }
+  .scrollbar-none { scrollbar-width: none; }
+  .scrollbar-none::-webkit-scrollbar { display: none; }
+  :root:not(.dark) .text-accent { color: #5c6b16; }
+  :root:not(.dark) .text-water { color: #0b6e99; }
+  :root:not(.dark) .text-protein { color: #2563eb; }
+  :root:not(.dark) .text-carbs { color: #8a5200; }
+  :root:not(.dark) .text-fat { color: #b93825; }
+  :root:not(.dark) .text-fibre { color: #217a45; }
+  :root:not(.dark) .text-error { color: #b42318; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
 }

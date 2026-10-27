@@ -1,18 +1,19 @@
 import Spinner from './Spinner'
 
 const variants = {
-  primary: 'bg-brand-green text-white hover:opacity-90',
-  secondary: 'border border-brand-green bg-white text-brand-green hover:bg-green-50',
-  ghost: 'bg-transparent text-gray-700 hover:bg-gray-100',
+  primary: 'bg-accent text-accent-ink hover:brightness-95',
+  secondary: 'border border-line bg-surface text-ink hover:bg-surface-2',
+  ghost: 'bg-transparent text-muted hover:bg-surface-2 hover:text-ink',
+  danger: 'bg-error/15 text-error hover:bg-error/25',
 }
 
-const sizes = { sm: 'px-3 py-1.5 text-sm', md: 'px-4 py-2.5 text-sm', lg: 'px-6 py-3 text-base' }
+const sizes = { sm: 'min-h-11 px-4 py-2 text-sm', md: 'min-h-11 px-5 py-2.5 text-sm', lg: 'min-h-12 px-6 py-3 text-base' }
 
-export default function Button({ variant = 'primary', size = 'md', loading = false, disabled = false, onClick, children, className = '' }) {
+export default function Button({ variant = 'primary', size = 'md', loading = false, loadingLabel, disabled = false, onClick, children, className = '', type = 'button', ...props }) {
   return (
-    <button type="button" onClick={onClick} disabled={disabled || loading} className={`inline-flex items-center justify-center gap-2 rounded-lg font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${variants[variant]} ${sizes[size]} ${className}`}>
+    <button type={type} onClick={onClick} disabled={disabled || loading} aria-busy={loading} className={`inline-flex items-center justify-center gap-2 rounded-full font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${variants[variant]} ${sizes[size]} ${className}`} {...props}>
       {loading && <Spinner size="sm" />}
-      {children}
+      {loading && loadingLabel ? loadingLabel : children}
     </button>
   )
 }
