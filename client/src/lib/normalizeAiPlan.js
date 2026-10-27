@@ -40,7 +40,8 @@ const normalizeItem = (item = {}) => ({
 })
 
 export const normalizeAiPlan = (payload) => {
-  const value = payload?.plan ?? payload
+  const hasPlanEnvelope = payload && typeof payload === 'object' && Object.hasOwn(payload, 'plan')
+  const value = hasPlanEnvelope ? payload.plan : payload
   if (!value || typeof value !== 'object') return null
   const meals = value.meals || {}
   const snacks = list(meals.snacks ?? meals.snack).map(normalizeItem)

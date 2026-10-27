@@ -82,7 +82,7 @@ export default function Dashboard() {
     const plan = normalizeAiPlan(planPayload)
     return { log: log || { entries: [] }, plan, weekly: Array.isArray(progress) ? progress : [], weights: Array.isArray(weights) ? weights : [] }
   }, { immediate: false, errorMessage: 'Unable to load your Home dashboard.' })
-  const targetsQuery = useApi(loadAiTargets, { errorMessage: 'Unable to calculate your AI nutrition targets.' })
+  const targetsQuery = useApi(loadAiTargets, { errorMessage: 'Unable to calculate your nutrition targets.' })
   const suggestions = useApi(getSuggestions, { errorMessage: 'Tip unavailable.' })
   const { execute } = query
 
@@ -170,7 +170,7 @@ export default function Dashboard() {
     finally { setSavingWeight(false) }
   }
 
-  if (query.loading || query.status === 'idle' || targetsQuery.loading) return <div><PageSkeleton /><p className="text-center text-sm text-accent">Calculating your targets with AI…</p></div>
+  if (query.loading || query.status === 'idle' || targetsQuery.loading) return <div><PageSkeleton /><p className="text-center text-sm text-accent">Calculating your nutrition targets…</p></div>
   if (query.status === 'error') return <ErrorState message={query.error} onRetry={() => load().catch(() => {})} />
   if (targetsQuery.status === 'error') return <ErrorState message={targetsQuery.error} onRetry={() => targetsQuery.retry().catch(() => {})} />
   const latestWeightEntry = [...query.data.weights].sort((a, b) => String(b.date).localeCompare(String(a.date)))[0]

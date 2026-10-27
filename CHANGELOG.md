@@ -1,5 +1,12 @@
 # SmartDiet AI frontend changelog
 
+## Personalized Indian meals and food search
+
+- Fixed empty API plan envelopes being rendered as zero-calorie plans and removed stale cached empty plans.
+- Strengthened meal generation prompts to return recognizable Indian dishes instead of generic meal names.
+- Removed provider-generated labels from meal-plan screens while preserving the nutrition medical disclaimer.
+- Upgraded food-log autocomplete to rank 1,075 Indian foods and filter suggestions by vegetarian, vegan, allergy, lactose, and gluten profile rules.
+
 ## Gemini targets and meal plans
 
 - Added protected AI-plan endpoints for cached Gemini nutrition targets and daily meal plans, with configurable model selection, quota/cooldown controls, retry handling and Firestore persistence.
