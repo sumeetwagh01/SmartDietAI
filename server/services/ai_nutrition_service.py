@@ -4,7 +4,8 @@ import logging
 import re
 from datetime import UTC, datetime
 
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 
 from config.settings import settings
 from models.ai_plan import AiPreferences, AiTargets, GeminiMealPlan
@@ -71,18 +72,21 @@ PLAN_SCHEMA_TEXT = {
 }
 
 
-async def _call_gemini(system_instruction: str, prompt: str, temperature: float) -> str:
+async def _call_gemini(system_instruction: str, prompt: str, response_schema) -> str:
     def run() -> str:
-        genai.configure(api_key=settings.GEMINI_API_KEY)
-        model = genai.GenerativeModel(
-            MODEL_NAME,
-            system_instruction=system_instruction,
-            generation_config=genai.GenerationConfig(
-                temperature=temperature,
-                response_mime_type="application/json",
-            ),
-        )
-        return model.generate_content(prompt).text
+        with genai.Client(api_key=settings.GEMINI_API_KEY) as client:
+            response = client.models.generate_content(
+                model=MODEL_NAME,
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    system_instruction=system_instruction,
+                    response_mime_type="application/json",
+                    response_schema=response_schema,
+                ),
+            )
+            if not response.text:
+                raise AiGenerationError("Gemini returned an empty response")
+            return response.text
 
     return await asyncio.wait_for(asyncio.to_thread(run), timeout=60)
 
@@ -92,7 +96,7 @@ async def generate_targets(profile: dict, preferences: AiPreferences) -> dict:
     prompt = f"User data: {json.dumps(payload, separators=(',', ':'))}\nReturn this exact JSON shape: {json.dumps(TARGET_SCHEMA_TEXT)}"
     for attempt in range(MAX_ATTEMPTS):
         try:
-            raw = await _call_gemini(TARGET_SYSTEM, prompt, 0.2)
+            raw = await _call_gemini(TARGET_SYSTEM, prompt, AiTargets)
             targets = AiTargets.model_validate(json.loads(_strip_fences(raw))).model_dump(mode="json")
             errors = validate_targets(targets, profile)
         except Exception as exc:
@@ -113,7 +117,7 @@ async def generate_meal_plan(profile: dict, preferences: AiPreferences, targets:
     prompt = f"Planning data: {json.dumps(payload, separators=(',', ':'))}\nReturn this exact JSON shape: {json.dumps(PLAN_SCHEMA_TEXT)}"
     for attempt in range(MAX_ATTEMPTS):
         try:
-            raw = await _call_gemini(PLAN_SYSTEM, prompt, 0.5)
+            raw = await _call_gemini(PLAN_SYSTEM, prompt, GeminiMealPlan)
             generated = GeminiMealPlan.model_validate(json.loads(_strip_fences(raw))).model_dump(mode="json")
             errors = validate_plan(generated, validation_profile, targets)
         except Exception as exc:

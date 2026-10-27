@@ -2,13 +2,14 @@ import asyncio
 import json
 from datetime import date, timedelta
 
-import google.generativeai as genai
-from fastapi import APIRouter, Depends
+from google import genai
+from google.genai import types
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from api.middleware.auth_middleware import get_current_user
 from config.settings import settings
-from services import firebase_service, gemini_service
+from services import firebase_service
 
 
 router = APIRouter(prefix="/ai")
@@ -19,11 +20,39 @@ class ChatRequest(BaseModel):
     history: list
 
 
-def _model():
-    if hasattr(gemini_service, "model"):
-        return gemini_service.model
-    genai.configure(api_key=settings.GEMINI_API_KEY)
-    return genai.GenerativeModel(gemini_service.MODEL_NAME)
+def _generate_text(prompt: str, system_instruction: str) -> str:
+    with genai.Client(api_key=settings.GEMINI_API_KEY) as client:
+        response = client.models.generate_content(
+            model=settings.GEMINI_MODEL,
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                system_instruction=system_instruction,
+            ),
+        )
+        if not response.text:
+            raise RuntimeError("Gemini returned an empty response")
+        return response.text
+
+
+async def _safe_generate(prompt: str, system_instruction: str) -> str:
+    try:
+        return await asyncio.wait_for(
+            asyncio.to_thread(_generate_text, prompt, system_instruction),
+            timeout=60,
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=502,
+            detail="NutriBites is unavailable right now. Please try again.",
+        ) from exc
+
+
+def _profile_context(user: dict) -> dict:
+    fields = (
+        "age", "gender", "height_cm", "weight_kg", "activity_level", "goal",
+        "medical_conditions", "allergens", "is_vegetarian", "is_vegan",
+    )
+    return {field: user.get(field) for field in fields}
 
 
 @router.post("/chat")
@@ -37,16 +66,14 @@ async def chat(
     system_prompt = (
         "You are a practical nutrition assistant. Use only this user profile and "
         "today's food-log summary when personalizing your answer. "
-        f"User profile: {user}. Today's food log: {today_log or {}}."
+        f"User profile: {_profile_context(user)}. Today's food log: {today_log or {}}."
     )
     prompt = (
-        f"{system_prompt}\n"
         f"Conversation history: {json.dumps(body.history, default=str)}\n"
         f"User question: {body.message}\n"
         "Give a concise, practical answer. Do not diagnose disease or replace medical care."
     )
-    response = await asyncio.to_thread(_model().generate_content, prompt)
-    return {"reply": response.text}
+    return {"reply": await _safe_generate(prompt, system_prompt)}
 
 
 @router.get("/suggestions")
@@ -60,7 +87,10 @@ async def suggestions(user: dict = Depends(get_current_user)):
     )
     prompt = (
         "Give exactly one short, practical diet tip based on this user profile "
-        f"and recent three-day food log. Profile: {user}. Logs: {logs}."
+        f"and recent three-day food log. Profile: {_profile_context(user)}. Logs: {logs}."
     )
-    response = await asyncio.to_thread(_model().generate_content, prompt)
-    return {"tip": response.text}
+    system_prompt = (
+        "You are a practical nutrition assistant, not a doctor. Give one concise, "
+        "safe suggestion and never diagnose or replace professional medical care."
+    )
+    return {"tip": await _safe_generate(prompt, system_prompt)}
