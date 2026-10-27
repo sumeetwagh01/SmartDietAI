@@ -4,6 +4,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     GEMINI_API_KEY: str
     GEMINI_MODEL: str = "gemini-3.6-flash"
+    GEMINI_FALLBACK_MODEL: str = "gemini-3.5-flash-lite"
     FIREBASE_PROJECT_ID: str
     FIREBASE_PRIVATE_KEY: str
     FIREBASE_CLIENT_EMAIL: str

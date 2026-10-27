@@ -4,12 +4,10 @@ import logging
 import re
 from datetime import UTC, datetime
 
-from google import genai
-from google.genai import types
-
 from config.settings import settings
 from models.ai_plan import AiPreferences, AiTargets, GeminiMealPlan
 from services.ai_safety import calculate_totals, enforced_rules, validate_plan, validate_targets
+from services.gemini_runtime import error_summary, generate_text
 
 
 logger = logging.getLogger(__name__)
@@ -73,21 +71,15 @@ PLAN_SCHEMA_TEXT = {
 
 
 async def _call_gemini(system_instruction: str, prompt: str) -> str:
-    def run() -> str:
-        with genai.Client(api_key=settings.GEMINI_API_KEY) as client:
-            response = client.models.generate_content(
-                model=MODEL_NAME,
-                contents=prompt,
-                config=types.GenerateContentConfig(
-                    system_instruction=system_instruction,
-                    response_mime_type="application/json",
-                ),
-            )
-            if not response.text:
-                raise AiGenerationError("Gemini returned an empty response")
-            return response.text
-
-    return await asyncio.wait_for(asyncio.to_thread(run), timeout=60)
+    return await asyncio.wait_for(
+        asyncio.to_thread(
+            generate_text,
+            prompt,
+            system_instruction,
+            json_response=True,
+        ),
+        timeout=60,
+    )
 
 
 async def generate_targets(profile: dict, preferences: AiPreferences) -> dict:
@@ -99,6 +91,9 @@ async def generate_targets(profile: dict, preferences: AiPreferences) -> dict:
             targets = AiTargets.model_validate(json.loads(_strip_fences(raw))).model_dump(mode="json")
             errors = validate_targets(targets, profile)
         except Exception as exc:
+            logger.warning("ai-plan target generation error=%s", error_summary(exc))
+            if type(exc).__name__ in {"ClientError", "ServerError"}:
+                raise AiGenerationError("Nutrition planning is temporarily unavailable. Please try again shortly.") from exc
             errors = [f"Invalid target output: {type(exc).__name__}"]
         if not errors:
             logger.info("ai-plan targets ok retries=%s", attempt)
@@ -120,6 +115,9 @@ async def generate_meal_plan(profile: dict, preferences: AiPreferences, targets:
             generated = GeminiMealPlan.model_validate(json.loads(_strip_fences(raw))).model_dump(mode="json")
             errors = validate_plan(generated, validation_profile, targets)
         except Exception as exc:
+            logger.warning("ai-plan meal generation error=%s", error_summary(exc))
+            if type(exc).__name__ in {"ClientError", "ServerError"}:
+                raise AiGenerationError("Nutrition planning is temporarily unavailable. Please try again shortly.") from exc
             errors = [f"Invalid meal-plan output: {type(exc).__name__}"]
         if not errors:
             logger.info("ai-plan meal-plan ok retries=%s", attempt)

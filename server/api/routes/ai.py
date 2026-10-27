@@ -1,18 +1,18 @@
 import asyncio
 import json
+import logging
 from datetime import date, timedelta
 
-from google import genai
-from google.genai import types
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from api.middleware.auth_middleware import get_current_user
-from config.settings import settings
 from services import firebase_service
+from services.gemini_runtime import error_summary, generate_text
 
 
 router = APIRouter(prefix="/ai")
+logger = logging.getLogger(__name__)
 
 
 class ChatRequest(BaseModel):
@@ -21,17 +21,7 @@ class ChatRequest(BaseModel):
 
 
 def _generate_text(prompt: str, system_instruction: str) -> str:
-    with genai.Client(api_key=settings.GEMINI_API_KEY) as client:
-        response = client.models.generate_content(
-            model=settings.GEMINI_MODEL,
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                system_instruction=system_instruction,
-            ),
-        )
-        if not response.text:
-            raise RuntimeError("Gemini returned an empty response")
-        return response.text
+    return generate_text(prompt, system_instruction)
 
 
 async def _safe_generate(prompt: str, system_instruction: str) -> str:
@@ -41,6 +31,7 @@ async def _safe_generate(prompt: str, system_instruction: str) -> str:
             timeout=60,
         )
     except Exception as exc:
+        logger.warning("NutriBites generation failed error=%s", error_summary(exc))
         raise HTTPException(
             status_code=502,
             detail="NutriBites is unavailable right now. Please try again.",
