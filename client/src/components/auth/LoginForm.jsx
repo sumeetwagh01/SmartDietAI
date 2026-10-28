@@ -7,8 +7,7 @@ import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import { getApiError } from '@/utils/apiError'
 import { clearPerUserClientData } from '@/utils/session'
-
-const profileIsComplete = (user) => Boolean(user?.age && user?.gender && user?.weight_kg && user?.height_cm && user?.activity_level && user?.goal)
+import { profileIsComplete } from '@/utils/profile'
 
 export default function LoginForm() {
   const navigate = useNavigate()

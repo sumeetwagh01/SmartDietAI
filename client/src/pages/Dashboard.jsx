@@ -30,11 +30,11 @@ import { lastDates, toIsoDate } from '@/utils/dates'
 import { mealSlots } from '@/utils/food'
 import { getApiError, isValidationError } from '@/utils/apiError'
 import { normalizeAiPlan, normalizeAiTargets } from '@/lib/normalizeAiPlan'
+import { profileDraft, profileIsComplete } from '@/utils/profile'
 
 const today = toIsoDate(new Date())
 const stages = ['Reading your profile…', 'Calculating your targets…', 'Planning your meals…', 'Running safety checks…']
 const normalizeMeal = (value) => value === 'snacks' ? 'snack' : mealSlots.includes(value) ? value : 'breakfast'
-const profileIsComplete = (user) => Boolean(user?.name && user?.age && user?.gender && user?.weight_kg && user?.height_cm && user?.activity_level && user?.goal)
 let targetsInFlight = null
 
 const loadAiTargets = async () => {
@@ -159,7 +159,7 @@ export default function Dashboard() {
     }
   }
   const reviewProfile = () => {
-    setOnboardingDraft({ name: user?.name || '', age: user?.age || '', gender: user?.gender || 'male', weight_kg: user?.weight_kg || '', height_cm: user?.height_cm || '', activity_level: user?.activity_level || 'moderate', goal: user?.goal || 'maintenance', medical_conditions: user?.medical_conditions || [], allergens: user?.allergens || [], is_vegetarian: Boolean(user?.is_vegetarian), is_vegan: Boolean(user?.is_vegan) })
+    setOnboardingDraft(profileDraft(user))
     setOnboardingStep(6); navigate('/onboarding')
   }
   const saveWeight = async (event) => {

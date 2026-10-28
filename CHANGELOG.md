@@ -1,5 +1,11 @@
 # SmartDiet AI frontend changelog
 
+## Returning-user profile recovery
+
+- Added a server-profile refresh before protected pages render so persisted browser sessions cannot bypass the completeness check.
+- Incomplete accounts now resume onboarding at the first missing required field with their saved values preserved, instead of failing Dashboard, Progress, or NutriBites AI requests.
+- Backend validation errors now identify which required profile fields are missing.
+
 ## Personalized Indian meals and food search
 
 - Fixed empty API plan envelopes being rendered as zero-calorie plans and removed stale cached empty plans.

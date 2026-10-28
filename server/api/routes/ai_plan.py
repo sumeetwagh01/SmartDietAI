@@ -19,8 +19,22 @@ def _profile_value(value):
 
 
 def _require_complete(profile: dict | None) -> dict:
-    if not profile or any(profile.get(field) in (None, "") for field in REQUIRED_PROFILE_FIELDS):
-        raise HTTPException(status_code=422, detail="Complete your profile first")
+    missing = [
+        field
+        for field in REQUIRED_PROFILE_FIELDS
+        if not profile or profile.get(field) in (None, "")
+    ]
+    if missing:
+        labels = {
+            "height_cm": "height",
+            "weight_kg": "weight",
+            "activity_level": "activity level",
+        }
+        readable = ", ".join(labels.get(field, field) for field in missing)
+        raise HTTPException(
+            status_code=422,
+            detail=f"Complete your profile first. Missing: {readable}.",
+        )
     return profile
 
 

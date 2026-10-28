@@ -47,9 +47,9 @@ function CrossTabAuthSync() {
   return null
 }
 
-function ProtectedPage({ children }) {
+function ProtectedPage({ children, allowIncomplete = false }) {
   return (
-    <ProtectedRoute>
+    <ProtectedRoute allowIncomplete={allowIncomplete}>
       <div className="min-h-screen bg-canvas text-ink lg:pl-64">
         <Sidebar />
         <Navbar />
@@ -71,7 +71,7 @@ export default function App() {
         <Route path="/" element={<Landing />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
-        <Route path="/onboarding" element={<ProtectedPage><Onboarding /></ProtectedPage>} />
+        <Route path="/onboarding" element={<ProtectedPage allowIncomplete><Onboarding /></ProtectedPage>} />
         <Route path="/dashboard" element={<ProtectedPage><Dashboard /></ProtectedPage>} />
         <Route path="/food-log" element={<ProtectedPage><FoodLog /></ProtectedPage>} />
         <Route path="/meal-plan" element={<ProtectedPage><MealPlan /></ProtectedPage>} />
