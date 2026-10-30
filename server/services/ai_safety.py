@@ -113,7 +113,27 @@ def calculate_totals(meals: dict) -> dict[str, float]:
     return {key: round(value, 2) for key, value in totals.items()}
 
 
-def validate_plan(plan: dict, profile: dict, targets: dict) -> list[str]:
+def _dish_key(value: str) -> str:
+    return " ".join(re.findall(r"[a-z0-9]+", str(value).lower()))
+
+
+def _matches_recent_dish(current: str, recent: str) -> bool:
+    current_key = _dish_key(current)
+    recent_key = _dish_key(recent)
+    if not current_key or not recent_key:
+        return False
+    if current_key == recent_key:
+        return True
+    shorter, longer = sorted((current_key, recent_key), key=len)
+    return len(shorter.split()) >= 2 and shorter in longer
+
+
+def validate_plan(
+    plan: dict,
+    profile: dict,
+    targets: dict,
+    recent_dishes: Iterable[str] | None = None,
+) -> list[str]:
     errors = []
     meals = plan.get("meals") or {}
     required_slots = {"breakfast", "lunch", "snacks", "dinner"}
@@ -149,6 +169,13 @@ def validate_plan(plan: dict, profile: dict, targets: dict) -> list[str]:
     duplicates = sorted({name for name in names if name and names.count(name) > 1})
     if duplicates:
         errors.append("Duplicate dishes: " + ", ".join(duplicates))
+    repeated = sorted({
+        name
+        for name in names
+        if any(_matches_recent_dish(name, recent) for recent in recent_dishes or [])
+    })
+    if repeated:
+        errors.append("Plan repeats recent dishes: " + ", ".join(repeated))
 
     totals = calculate_totals(meals)
     target_calories = float(targets.get("calories", 0) or 0)

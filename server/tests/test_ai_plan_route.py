@@ -55,7 +55,7 @@ async def test_failed_safe_plan_generation_returns_502(monkeypatch):
     async def get_plan(uid, date_str): return None
     async def get_targets(uid): return {"targets": TARGETS, "profile_hash": expected_hash, "preferences": {}}
     async def claim(*args): return None
-    async def unsafe(*args): raise ai_plan.AiGenerationError("Couldn't generate a safe result right now. Please try again.")
+    async def unsafe(*args, **kwargs): raise ai_plan.AiGenerationError("Couldn't generate a safe result right now. Please try again.")
     monkeypatch.setattr(ai_plan.firebase_service, "get_user_profile", get_profile)
     monkeypatch.setattr(ai_plan.firebase_service, "get_ai_plan", get_plan)
     monkeypatch.setattr(ai_plan.firebase_service, "get_ai_targets", get_targets)

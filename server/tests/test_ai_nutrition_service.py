@@ -53,3 +53,27 @@ async def test_three_unsafe_plans_raise_safe_error(monkeypatch):
     monkeypatch.setattr(ai_nutrition_service, "_call_gemini", fake_call)
     with pytest.raises(ai_nutrition_service.AiGenerationError, match="safe result"):
         await ai_nutrition_service.generate_meal_plan(PROFILE, AiPreferences(), TARGETS, "2026-10-27")
+
+
+@pytest.mark.asyncio
+async def test_recent_dish_is_retried_with_different_meal(monkeypatch):
+    calls = []
+    answers = [
+        response(item("Punjabi Rajma Masala", ["rajma", "tomato"])),
+        response(item("Vegetable Poha", ["rice flakes", "peas"])),
+    ]
+
+    async def fake_call(*args):
+        calls.append(args)
+        return answers[len(calls) - 1]
+
+    monkeypatch.setattr(ai_nutrition_service, "_call_gemini", fake_call)
+    result = await ai_nutrition_service.generate_meal_plan(
+        PROFILE,
+        AiPreferences(),
+        TARGETS,
+        "2026-10-27",
+        recent_dishes=["Rajma Masala"],
+    )
+    assert len(calls) == 2
+    assert result["meals"]["breakfast"][0]["name"] == "Vegetable Poha"

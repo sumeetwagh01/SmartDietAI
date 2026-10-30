@@ -1,6 +1,7 @@
 import hashlib
+import asyncio
 import json
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
@@ -58,6 +59,32 @@ def profile_hash(profile: dict, preferences: AiPreferences) -> str:
 
 async def _profile(uid: str) -> dict:
     return _require_complete(await firebase_service.get_user_profile(uid))
+
+
+def _plan_dish_names(plan: dict | None) -> list[str]:
+    names = []
+    for items in (plan or {}).get("meals", {}).values():
+        for item in items or []:
+            name = str(item.get("name", "")).strip()
+            if name:
+                names.append(name)
+    return names
+
+
+async def _recent_dishes(uid: str, plan_date: date, days: int = 7) -> list[str]:
+    dates = [plan_date - timedelta(days=offset) for offset in range(days)]
+    plans = await asyncio.gather(
+        *(firebase_service.get_ai_plan(uid, value.isoformat()) for value in dates)
+    )
+    names = []
+    seen = set()
+    for plan in plans:
+        for name in _plan_dish_names(plan):
+            key = name.casefold()
+            if key not in seen:
+                names.append(name)
+                seen.add(key)
+    return names[:60]
 
 
 def _preferences(value: dict | None) -> AiPreferences:
@@ -149,7 +176,14 @@ async def generate_meal_plan(body: GenerateMealPlanRequest, user: dict = Depends
         else:
             targets = await _generate_and_save_targets(user["uid"], profile, body.preferences, hash_value)
             generated_targets = True
-        plan = await ai_nutrition_service.generate_meal_plan(profile, body.preferences, targets, date_str)
+        recent_dishes = await _recent_dishes(user["uid"], body.date)
+        plan = await ai_nutrition_service.generate_meal_plan(
+            profile,
+            body.preferences,
+            targets,
+            date_str,
+            recent_dishes=recent_dishes,
+        )
     except AiGenerationError as exc:
         await _release(user["uid"], 1 if generated_targets else reserved)
         raise HTTPException(status_code=502, detail=str(exc)) from exc

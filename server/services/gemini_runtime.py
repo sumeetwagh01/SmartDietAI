@@ -47,6 +47,7 @@ def generate_text(
     system_instruction: str,
     *,
     json_response: bool = False,
+    temperature: float | None = None,
 ) -> str:
     last_error: Exception | None = None
     for index, model_name in enumerate(_models()):
@@ -54,6 +55,7 @@ def generate_text(
             config = types.GenerateContentConfig(
                 system_instruction=system_instruction,
                 response_mime_type="application/json" if json_response else None,
+                temperature=temperature,
             )
             with genai.Client(api_key=settings.GEMINI_API_KEY) as client:
                 response = client.models.generate_content(

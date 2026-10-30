@@ -68,3 +68,19 @@ def test_hypertension_sodium_cap():
     profile = {**BASE_PROFILE, "medical_conditions": ["hypertension"]}
     unsafe = plan(*[item(f"Dish {index}", ["rice"], sodium=600) for index in range(4)])
     assert any("sodium" in error.lower() for error in validate_plan(unsafe, profile, TARGETS))
+
+
+def test_recent_dishes_and_trivial_variations_are_rejected():
+    repeated = plan(
+        item("Punjabi Rajma Masala", ["rajma", "tomato"]),
+        item("Jeera Basmati Rice", ["rice"]),
+        item("Apple Chaat", ["apple"]),
+        item("Vegetable Khichdi", ["rice", "vegetables"]),
+    )
+    errors = validate_plan(
+        repeated,
+        BASE_PROFILE,
+        TARGETS,
+        recent_dishes=["Rajma Masala", "Basmati Rice"],
+    )
+    assert any("repeats recent dishes" in error for error in errors)
